@@ -1,1 +1,127 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc. --><path d="M528.3 46.5H388.5c-48.1 0-89.9 33.3-100.4 80.3-10.6-47-52.3-80.3-100.4-80.3H48c-26.5 0-48 21.5-48 48v245.8c0 26.5 21.5 48 48 48h89.7c102.2 0 132.7 24.4 147.3 75 .7 2.8 5.2 2.8 6 0 14.7-50.6 45.2-75 147.3-75H528c26.5 0 48-21.5 48-48V94.6c0-26.4-21.3-47.9-47.7-48.1zM242 311.9c0 1.9-1.5 3.5-3.5 3.5H78.2c-1.9 0-3.5-1.5-3.5-3.5V289c0-1.9 1.5-3.5 3.5-3.5h160.4c1.9 0 3.5 1.5 3.5 3.5v22.9zm0-60.9c0 1.9-1.5 3.5-3.5 3.5H78.2c-1.9 0-3.5-1.5-3.5-3.5v-22.9c0-1.9 1.5-3.5 3.5-3.5h160.4c1.9 0 3.5 1.5 3.5 3.5V251zm0-60.9c0 1.9-1.5 3.5-3.5 3.5H78.2c-1.9 0-3.5-1.5-3.5-3.5v-22.9c0-1.9 1.5-3.5 3.5-3.5h160.4c1.9 0 3.5 1.5 3.5 3.5v22.9zm259.3 121.7c0 1.9-1.5 3.5-3.5 3.5H337.5c-1.9 0-3.5-1.5-3.5-3.5v-22.9c0-1.9 1.5-3.5 3.5-3.5h160.4c1.9 0 3.5 1.5 3.5 3.5v22.9zm0-60.9c0 1.9-1.5 3.5-3.5 3.5H337.5c-1.9 0-3.5-1.5-3.5-3.5V228c0-1.9 1.5-3.5 3.5-3.5h160.4c1.9 0 3.5 1.5 3.5 3.5v22.9zm0-60.9c0 1.9-1.5 3.5-3.5 3.5H337.5c-1.9 0-3.5-1.5-3.5-3.5v-22.8c0-1.9 1.5-3.5 3.5-3.5h160.4c1.9 0 3.5 1.5 3.5 3.5V190z"/></svg>
+#include <iostream>
+#include <string>
+#include <fstream>
+#include <cstdio>
+#include <cstdlib>
+
+void backtrack(int step, int n, std::string current)
+{
+    if (step == n)
+    {
+        std::cout << current << std::endl;
+        return;
+    }
+    for (char c = 'a'; c <= 'c'; ++c)
+    {
+        current.push_back(c);
+        backtrack(step + 1, n, current);
+        current.pop_back();
+    }
+}
+
+void solution();
+
+int main()
+{
+    solution();
+    return 0;
+}
+
+void solution()
+{
+    std::string line, prompt;
+    while (std::getline(std::cin, line) && line != "exit")
+    {
+        prompt += line + "\n";
+    }
+    if (!prompt.empty() && prompt.back() == '\n')
+        prompt.pop_back();
+
+    // 2) Escape JSON inline
+    std::string esc;
+    for (char c : prompt)
+    {
+        if (c == '"')
+            esc += "\\\"";
+        else if (c == '\\')
+            esc += "\\\\";
+        else if (c == '\n')
+            esc += "\\n";
+        else
+            esc += c;
+    }
+
+    // 3) Tạo payload JSON
+    std::string json = "{"
+                       "\"model\":\"deepseek-ai/deepseek-v3.1-terminus\","
+                       "\"messages\":["
+                       "{\"role\":\"user\",\"content\":\"" +
+                       esc + "\"}"
+                             "]"
+                             "}";
+
+    // 4) Ghi payload tạm
+    {
+        std::ofstream fp("payload.json");
+        fp << json;
+    }
+
+    // 5) Hiển thị loading
+    std::cout << "loading";
+
+    // 6) Chạy curl và đọc raw response
+    std::string cmd =
+        "curl -s -X POST "
+        "-H \"Content-Type: application/json\" "
+        "-H \"Authorization: Bearer sk-mega-05384487aaae9d72f8e13cd2a4ca3133af10dd341a92a5054271d6f13e894a77\" "
+        "-d @payload.json "
+        "https://ai.megallm.io/v1/chat/completions";
+    FILE *pipe = _popen(cmd.c_str(), "r");
+    if (!pipe)
+    {
+        return;
+    }
+    std::string raw;
+    char buffer[4096];
+    while (fgets(buffer, sizeof(buffer), pipe))
+    {
+        raw += buffer;
+    }
+    _pclose(pipe);
+
+    // 7) Bỏ quotes đầu-cuối nếu có
+    if (raw.size() >= 2 && raw.front() == '"' && raw.back() == '"')
+    {
+        raw = raw.substr(1, raw.size() - 2);
+    }
+
+    // 8) Unescape JSON inline
+    std::string code;
+    for (size_t i = 0; i < raw.size(); ++i)
+    {
+        if (raw[i] == '\\' && i + 1 < raw.size())
+        {
+            ++i;
+            char esc = raw[i];
+            if (esc == 'n')
+                code += '\n';
+            else if (esc == 't')
+                code += '\t';
+            else if (esc == '\\')
+                code += '\\';
+            else if (esc == '"')
+                code += '"';
+            else
+                code += esc;
+        }
+        else
+        {
+            code += raw[i];
+        }
+    }
+
+    // 9) Ghi code ra file test.cpp
+    std::ofstream out("test.cpp", std::ios::binary);
+    out << code;
+    out.close();
+}
